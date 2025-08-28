@@ -5,6 +5,8 @@
   "type": "module",
   "main": "main.cjs",
   "homepage": "./",
+  "description": "식당용 레시피 관리 앱 - React + TypeScript + Electron",
+  "author": "aiden-flo-fe",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -86,6 +86,14 @@ npm run electron-build
 npm run dist
 ```
 
+
+### 빌드 및 배포
+``` bash
+npm run build
+npm run dist
+npx electron-builder // 윈도우용 배포
+```
+
 ## 📋 데이터 모델
 
 ### Category

@@ -17,8 +17,17 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      enableRemoteModule: false,
+      allowRunningInsecureContent: false,
+      webSecurity: true,
+      sandbox: false, // macOS에서 필요
     },
     icon: path.join(__dirname, 'assets', 'icon.png'), // 아이콘이 있다면
+    // macOS에서 더 안전한 실행을 위한 설정
+    ...(process.platform === 'darwin' && {
+      titleBarStyle: 'default',
+      vibrancy: 'under-window',
+    }),
   });
 
   // 개발 모드에서는 로컬 서버, 프로덕션에서는 로컬 파일
@@ -36,7 +45,13 @@ async function createWindow() {
       mainWindow.webContents.openDevTools();
     }
   } else {
-    await loadAppFromUserData();
+    // 프로덕션 모드에서는 더 안전한 방식으로 로딩
+    try {
+      await loadAppFromUserData();
+    } catch (error) {
+      console.error('앱 로딩 실패, fallback 페이지 표시:', error);
+      await showDefaultPage();
+    }
   }
 }
 
@@ -123,11 +138,23 @@ async function loadAppFromUserData() {
       console.error('파일 읽기 실패:', readError);
     }
     
-    // loadFile 대신 loadURL 사용 (더 안전함)
-    const fileUrl = `file://${appIndexPath}`;
-    console.log(`로딩할 URL: ${fileUrl}`);
-    
-    mainWindow.loadURL(fileUrl);
+    // macOS에서 더 안전한 방식으로 로딩
+    if (platform === 'darwin') {
+      // macOS에서는 data URL 방식 사용 (SIP 문제 방지)
+      try {
+        const fileContent = await fs.readFile(appIndexPath, 'utf-8');
+        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(fileContent)}`;
+        console.log('macOS: data URL 방식으로 로딩');
+        mainWindow.loadURL(dataUrl);
+      } catch (readError) {
+        console.error('파일 읽기 실패, fallback 사용:', readError);
+        mainWindow.loadFile(appIndexPath);
+      }
+    } else {
+      // Windows/Linux에서는 기존 방식 사용
+      console.log('Windows/Linux: loadFile 방식으로 로딩');
+      mainWindow.loadFile(appIndexPath);
+    }
     
     // 기본 파일을 userData에 복사하여 다음 실행 시 사용
     try {
