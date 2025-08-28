@@ -23,17 +23,79 @@ async function createWindow() {
 
   // 개발 모드에서는 로컬 서버, 프로덕션에서는 로컬 파일
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // 개발 모드에서도 dist 폴더가 있으면 사용, 없으면 로컬 서버
+    const devDistPath = path.join(__dirname, 'dist');
+    try {
+      await fs.access(path.join(devDistPath, 'index.html'));
+      console.log('개발 모드: dist 폴더 발견, 로컬 파일 사용');
+      mainWindow.loadFile(path.join(devDistPath, 'index.html'));
+      mainWindow.webContents.openDevTools();
+    } catch (error) {
+      console.log('개발 모드: dist 폴더 없음, 로컬 서버 사용');
+      mainWindow.loadURL('http://localhost:5173');
+      mainWindow.webContents.openDevTools();
+    }
   } else {
     await loadAppFromUserData();
   }
 }
 
 async function loadAppFromUserData() {
+  // 플랫폼별 dist 파일 저장 위치 결정
+  const platform = process.platform;
+  let userDataDistPath, appDistPath;
+  
+  if (platform === 'darwin') {
+    // macOS: ~/Library/Application Support/recipe/dist
+    userDataDistPath = path.join(app.getPath('userData'), 'dist');
+    // macOS: 앱 번들 내부의 dist 폴더 (개발 시에는 __dirname/dist)
+    if (process.env.NODE_ENV === 'development') {
+      appDistPath = path.join(__dirname, 'dist');
+    } else {
+      // 프로덕션에서는 여러 가능한 경로 시도
+      const possiblePaths = [
+        path.join(process.resourcesPath, 'app', 'dist'),
+        path.join(__dirname, 'dist'),
+        path.join(__dirname, '..', 'dist'),
+        path.join(__dirname, '..', '..', 'dist')
+      ];
+      
+      // 첫 번째로 존재하는 경로 사용
+      for (const possiblePath of possiblePaths) {
+        try {
+          await fs.access(path.join(possiblePath, 'index.html'));
+          appDistPath = possiblePath;
+          console.log(`macOS에서 dist 폴더 발견: ${appDistPath}`);
+          break;
+        } catch (error) {
+          console.log(`경로 시도 실패: ${possiblePath}`);
+        }
+      }
+      
+      if (!appDistPath) {
+        appDistPath = path.join(process.resourcesPath, 'app', 'dist');
+      }
+    }
+  } else if (platform === 'win32') {
+    // Windows: %APPDATA%/recipe/dist
+    userDataDistPath = path.join(app.getPath('userData'), 'dist');
+    // Windows: 앱 설치 경로의 dist 폴더
+    appDistPath = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, 'dist')
+      : path.join(process.resourcesPath, 'app', 'dist');
+  } else {
+    // Linux: ~/.config/recipe/dist
+    userDataDistPath = path.join(app.getPath('userData'), 'dist');
+    appDistPath = process.env.NODE_ENV === 'development'
+      ? path.join(__dirname, 'dist')
+      : path.join(process.resourcesPath, 'app', 'dist');
+  }
+
+  console.log(`플랫폼: ${platform}`);
+  console.log(`userData 경로: ${userDataDistPath}`);
+  console.log(`앱 dist 경로: ${appDistPath}`);
+
   // 1. 먼저 userData의 dist 폴더 확인 (업데이트된 파일)
-  const userDataPath = app.getPath('userData');
-  const userDataDistPath = path.join(userDataPath, 'dist');
   const userDataIndexPath = path.join(userDataDistPath, 'index.html');
 
   try {
@@ -46,13 +108,26 @@ async function loadAppFromUserData() {
   }
 
   // 2. 빌드 시 포함된 dist 파일 확인 (기본 파일)
-  const appDistPath = path.join(__dirname, 'dist');
   const appIndexPath = path.join(appDistPath, 'index.html');
 
   try {
     await fs.access(appIndexPath);
     console.log('빌드 시 포함된 dist 파일을 사용합니다.');
-    mainWindow.loadFile(appIndexPath);
+    
+    // 파일 내용 확인 (디버깅용)
+    try {
+      const fileContent = await fs.readFile(appIndexPath, 'utf-8');
+      console.log(`index.html 파일 크기: ${fileContent.length} bytes`);
+      console.log(`파일 시작 부분: ${fileContent.substring(0, 100)}...`);
+    } catch (readError) {
+      console.error('파일 읽기 실패:', readError);
+    }
+    
+    // loadFile 대신 loadURL 사용 (더 안전함)
+    const fileUrl = `file://${appIndexPath}`;
+    console.log(`로딩할 URL: ${fileUrl}`);
+    
+    mainWindow.loadURL(fileUrl);
     
     // 기본 파일을 userData에 복사하여 다음 실행 시 사용
     try {
@@ -66,6 +141,7 @@ async function loadAppFromUserData() {
     return;
   } catch (error) {
     console.log('빌드 시 포함된 dist 파일도 없습니다. 기본 페이지를 표시합니다.');
+    console.error('파일 접근 오류:', error);
   }
 
   // 3. 모든 dist 파일이 없는 경우 기본 페이지 표시
