@@ -31,3 +31,6 @@ electron-dist
 *.njsproj
 *.sln
 *.sw?
+
+
+release.md
