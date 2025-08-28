@@ -1,5 +1,4 @@
 const { app, BrowserWindow, dialog } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs').promises;
 const https = require('https');
