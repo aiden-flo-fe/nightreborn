@@ -31,17 +31,45 @@ async function createWindow() {
 }
 
 async function loadAppFromUserData() {
+  // 1. 먼저 userData의 dist 폴더 확인 (업데이트된 파일)
   const userDataPath = app.getPath('userData');
-  const distPath = path.join(userDataPath, 'dist');
-  const indexPath = path.join(distPath, 'index.html');
+  const userDataDistPath = path.join(userDataPath, 'dist');
+  const userDataIndexPath = path.join(userDataDistPath, 'index.html');
 
   try {
-    await fs.access(indexPath);
-    mainWindow.loadFile(indexPath);
+    await fs.access(userDataIndexPath);
+    console.log('업데이트된 dist 파일을 사용합니다.');
+    mainWindow.loadFile(userDataIndexPath);
+    return;
   } catch (error) {
-    console.log('로컬 dist 파일이 없습니다. 기본 페이지를 표시합니다.');
-    await showDefaultPage();
+    console.log('userData에 dist 파일이 없습니다.');
   }
+
+  // 2. 빌드 시 포함된 dist 파일 확인 (기본 파일)
+  const appDistPath = path.join(__dirname, 'dist');
+  const appIndexPath = path.join(appDistPath, 'index.html');
+
+  try {
+    await fs.access(appIndexPath);
+    console.log('빌드 시 포함된 dist 파일을 사용합니다.');
+    mainWindow.loadFile(appIndexPath);
+    
+    // 기본 파일을 userData에 복사하여 다음 실행 시 사용
+    try {
+      await fs.mkdir(userDataDistPath, { recursive: true });
+      await copyDirectory(appDistPath, userDataDistPath);
+      console.log('기본 dist 파일을 userData에 복사했습니다.');
+    } catch (copyError) {
+      console.error('기본 dist 파일 복사 실패:', copyError);
+    }
+    
+    return;
+  } catch (error) {
+    console.log('빌드 시 포함된 dist 파일도 없습니다. 기본 페이지를 표시합니다.');
+  }
+
+  // 3. 모든 dist 파일이 없는 경우 기본 페이지 표시
+  await showDefaultPage();
 }
 
 async function checkForUpdates() {
@@ -406,6 +434,29 @@ function extractZip(zipPath, outputDir) {
       zipfile.on('error', reject);
     });
   });
+}
+
+async function copyDirectory(source, destination) {
+  try {
+    await fs.mkdir(destination, { recursive: true });
+    
+    const items = await fs.readdir(source);
+    
+    for (const item of items) {
+      const sourcePath = path.join(source, item);
+      const destPath = path.join(destination, item);
+      
+      const stat = await fs.stat(sourcePath);
+      
+      if (stat.isDirectory()) {
+        await copyDirectory(sourcePath, destPath);
+      } else {
+        await fs.copyFile(sourcePath, destPath);
+      }
+    }
+  } catch (error) {
+    throw new Error(`디렉토리 복사 실패: ${error.message}`);
+  }
 }
 
 // Electron 앱 이벤트
