@@ -58,7 +58,7 @@
   },
   "build": {
     "appId": "com.nightreborn.recipe",
-    "productName": "NightrebornRecipeSetup",
+    "productName": "NightrebornRecipe",
     "directories": {
       "output": "electron-dist"
     },
