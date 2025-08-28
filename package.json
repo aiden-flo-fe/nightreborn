@@ -126,14 +126,6 @@
         }
       ],
       "icon": "build/icon/512x512.png"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "aiden-flo-fe",
-      "repo": "nightreborn",
-      "releaseType": "release",
-      "draft": false,
-      "prerelease": false
     }
   }
 }
