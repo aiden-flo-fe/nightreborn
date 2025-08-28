@@ -4,8 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ICON_SOURCE = 'assets/icon/512x512.png';
-const ICON_DIR = 'assets/icon';
+const ICON_SOURCE = 'build/icon/512x512.png';
+const ICON_DIR = 'build/icon';
 
 console.log('🚀 자동 아이콘 빌드 시작...');
 console.log('========================');

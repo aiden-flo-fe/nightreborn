@@ -25,12 +25,13 @@ jobs:
       - name: Ensure Windows icon (.ico)
         shell: pwsh
         run: |
-          if (!(Test-Path 'assets/icon/icon.ico')) {
-            Write-Host 'Generating icon.ico from assets/icon/512x512.png using ImageMagick'
+          if (!(Test-Path 'build/icon/icon.ico')) {
+            Write-Host 'Generating icon.ico from build/icon/512x512.png using ImageMagick'
             choco install imagemagick -y --no-progress
             $env:Path += ';C:\\Program Files\\ImageMagick-7.0.11-Q16-HDRI'
             magick --version
-            magick assets/icon/512x512.png -define icon:auto-resize=256,128,64,48,32,16 assets/icon/icon.ico
+            New-Item -ItemType Directory -Force -Path 'build/icon' | Out-Null
+            magick build/icon/512x512.png -define icon:auto-resize=256,128,64,48,32,16 build/icon/icon.ico
           } else {
             Write-Host 'icon.ico already exists, skipping generation'
           }

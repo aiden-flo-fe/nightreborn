@@ -87,7 +87,7 @@
           ]
         }
       ],
-      "icon": "assets/icon/icon.icns",
+      "icon": "build/icon/icon.icns",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
@@ -103,15 +103,15 @@
           ]
         }
       ],
-      "icon": "assets/icon/icon.ico"
+      "icon": "build/icon/icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon/icon.ico",
-      "uninstallerIcon": "assets/icon/icon.ico",
-      "installerHeaderIcon": "assets/icon/icon.ico",
+      "installerIcon": "build/icon/icon.ico",
+      "uninstallerIcon": "build/icon/icon.ico",
+      "installerHeaderIcon": "build/icon/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "그밤 레시피"
@@ -125,7 +125,7 @@
           ]
         }
       ],
-      "icon": "assets/icon/512x512.png"
+      "icon": "build/icon/512x512.png"
     },
     "publish": {
       "provider": "github",

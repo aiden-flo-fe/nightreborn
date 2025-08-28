@@ -3,8 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const ICON_SOURCE = 'assets/icon/512x512.png';
-const ICON_DIR = 'assets/icon';
+const ICON_SOURCE = 'build/icon/512x512.png';
+const ICON_DIR = 'build/icon';
 
 function checkSourceIcon() {
   if (!fs.existsSync(ICON_SOURCE)) {
@@ -35,15 +35,15 @@ function createIconInstructions() {
 
   console.log('\n🍎 macOS용 (.icns):');
   console.log('- 온라인 변환: https://cloudconvert.com/png-to-icns');
-  console.log('- 저장 위치: assets/icon/icon.icns');
+  console.log('- 저장 위치: build/icon/icon.icns');
 
   console.log('\n🪟 Windows용 (.ico):');
   console.log('- 온라인 변환: https://cloudconvert.com/png-to-ico');
-  console.log('- 저장 위치: assets/icon/icon.ico');
+  console.log('- 저장 위치: build/icon/icon.ico');
 
   console.log('\n🐧 Linux용 (.png):');
   console.log('- 원본 파일을 복사하거나 512x512로 리사이즈');
-  console.log('- 저장 위치: assets/icon/512x512.png');
+  console.log('- 저장 위치: build/icon/512x512.png');
 
   console.log('\n🚀 macOS에서 자동 변환 (iconutil 사용):');
   console.log('mkdir icon.iconset');
@@ -79,7 +79,7 @@ function createIconInstructions() {
       ICON_SOURCE +
       ' --out icon.iconset/icon_512x512@2x.png'
   );
-  console.log('iconutil -c icns icon.iconset -o assets/icon/icon.icns');
+  console.log('iconutil -c icns icon.iconset -o build/icon/icon.icns');
   console.log('rm -rf icon.iconset');
 }
 
