@@ -39,8 +39,8 @@ async function loadAppFromUserData() {
     await fs.access(indexPath);
     mainWindow.loadFile(indexPath);
   } catch (error) {
-    console.log('로컬 dist 파일이 없습니다. 초기 설치를 진행합니다.');
-    await downloadInitialVersion();
+    console.log('로컬 dist 파일이 없습니다. 기본 페이지를 표시합니다.');
+    await showDefaultPage();
   }
 }
 
@@ -70,9 +70,12 @@ async function checkForUpdates() {
       if (result.response === 0) {
         await performUpdate(latestVersion);
       }
+    } else if (latestVersion) {
+      console.log('이미 최신 버전입니다.');
     }
   } catch (error) {
     console.error('업데이트 확인 중 오류:', error);
+    // 오류가 발생해도 앱은 계속 실행
   }
 }
 
@@ -92,18 +95,29 @@ async function getLatestVersionFromGitHub() {
       res.on('end', () => {
         try {
           const release = JSON.parse(data);
-          resolve(release.tag_name?.replace('v', ''));
+          if (release && release.tag_name) {
+            resolve(release.tag_name.replace('v', ''));
+          } else {
+            resolve(null); // 릴리스가 없거나 태그가 없는 경우
+          }
         } catch (error) {
-          reject(error);
+          console.error('GitHub API 응답 파싱 오류:', error);
+          resolve(null); // 파싱 오류 시 null 반환
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('error', (error) => {
+      console.error('GitHub API 요청 오류:', error);
+      resolve(null); // 네트워크 오류 시 null 반환
+    });
+    
     req.setTimeout(10000, () => {
       req.destroy();
-      reject(new Error('요청 시간 초과'));
+      console.error('GitHub API 요청 시간 초과');
+      resolve(null); // 시간 초과 시 null 반환
     });
+    
     req.end();
   });
 }
@@ -119,21 +133,127 @@ async function getCurrentVersion() {
   }
 }
 
-async function downloadInitialVersion() {
+async function showDefaultPage() {
   try {
-    const latestVersion = await getLatestVersionFromGitHub();
-    if (latestVersion) {
-      await performUpdate(latestVersion, true);
-    } else {
-      throw new Error('초기 버전을 가져올 수 없습니다.');
-    }
+    // 간단한 기본 HTML 페이지 생성
+    const defaultHTML = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>레시피 관리 앱</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+        .subtitle {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .message {
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            max-width: 500px;
+        }
+        .button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🍳</div>
+        <h1>그리고 밤은 되살아난다</h1>
+        <div class="subtitle">레시피 관리 앱</div>
+        <div class="message">
+            앱이 처음 실행되었습니다.<br>
+            GitHub에서 최신 버전을 다운로드하여 완전한 기능을 사용할 수 있습니다.
+        </div>
+        <button class="button" onclick="checkForUpdates()">업데이트 확인</button>
+        <br><br>
+        <button class="button" onclick="openGitHub()">GitHub 방문</button>
+    </div>
+    
+    <script>
+        function checkForUpdates() {
+            // Electron의 업데이트 체크 함수 호출
+            if (window.electronAPI) {
+                window.electronAPI.checkForUpdates();
+            } else {
+                alert('업데이트 기능을 사용할 수 없습니다.');
+            }
+        }
+        
+        function openGitHub() {
+            if (window.electronAPI) {
+                window.electronAPI.openExternal('https://github.com/aiden-flo-fe/nightreborn');
+            } else {
+                window.open('https://github.com/aiden-flo-fe/nightreborn', '_blank');
+        }
+        }
+    </script>
+</body>
+</html>`;
+
+    // 임시 HTML 파일 생성
+    const tempDir = path.join(app.getPath('temp'), 'recipe-app');
+    await fs.mkdir(tempDir, { recursive: true });
+    const tempHTMLPath = path.join(tempDir, 'default.html');
+    await fs.writeFile(tempHTMLPath, defaultHTML);
+    
+    mainWindow.loadFile(tempHTMLPath);
+    
+    // 기본 페이지에서 업데이트 체크 시도
+    setTimeout(() => {
+      checkForUpdates();
+    }, 2000);
+    
   } catch (error) {
-    console.error('초기 설치 실패:', error);
-    dialog.showErrorBox(
-      '초기 설치 실패',
-      '앱을 초기화할 수 없습니다.\n네트워크 연결을 확인해주세요.'
-    );
-    app.quit();
+    console.error('기본 페이지 생성 실패:', error);
+    // 오류 발생 시 간단한 메시지 표시
+    mainWindow.loadURL('data:text/html,<html><body><h1>레시피 관리 앱</h1><p>앱을 초기화하는 중입니다...</p></body></html>');
   }
 }
 
