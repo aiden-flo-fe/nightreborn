@@ -15,165 +15,98 @@ async function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
+      // macOS SIP 문제 해결을 위한 최소한의 설정
       nodeIntegration: false,
-      contextIsolation: true,
+      contextIsolation: false, // SIP 문제로 인해 비활성화
       enableRemoteModule: false,
-      allowRunningInsecureContent: false,
-      webSecurity: true,
-      sandbox: false, // macOS에서 필요
+      allowRunningInsecureContent: true,
+      webSecurity: false,
+      sandbox: false,
+      // 안정성을 위한 추가 설정
+      experimentalFeatures: false,
+      enableBlinkFeatures: '',
+      v8CacheOptions: 'none',
+      backgroundThrottling: false,
+      offscreen: false,
+      // macOS에서 메모리 관련 문제 방지
+      ...(process.platform === 'darwin' && {
+        spellcheck: false,
+        enableWebSQL: false,
+        plugins: false,
+      }),
     },
     icon: path.join(__dirname, 'assets', 'icon.png'), // 아이콘이 있다면
     // macOS에서 더 안전한 실행을 위한 설정
     ...(process.platform === 'darwin' && {
       titleBarStyle: 'default',
       vibrancy: 'under-window',
+      // SIP 문제 해결을 위한 추가 설정
+      show: false, // 창을 숨긴 상태로 시작
     }),
   });
 
-  // 개발 모드에서는 로컬 서버, 프로덕션에서는 로컬 파일
+  // macOS에서 창이 준비된 후 표시
+  if (process.platform === 'darwin') {
+    mainWindow.once('ready-to-show', () => {
+      mainWindow.show();
+    });
+  }
+
+  // 단순화된 파일 로딩 로직
   if (process.env.NODE_ENV === 'development') {
-    // 개발 모드에서도 dist 폴더가 있으면 사용, 없으면 로컬 서버
-    const devDistPath = path.join(__dirname, 'dist');
+    // 개발 모드: 로컬 서버 우선, 없으면 dist 폴더
     try {
-      await fs.access(path.join(devDistPath, 'index.html'));
-      console.log('개발 모드: dist 폴더 발견, 로컬 파일 사용');
-      mainWindow.loadFile(path.join(devDistPath, 'index.html'));
+      console.log('개발 모드: 로컬 서버 연결 시도');
+      mainWindow.loadURL('http://localhost:5173');
       mainWindow.webContents.openDevTools();
     } catch (error) {
-      console.log('개발 모드: dist 폴더 없음, 로컬 서버 사용');
-      mainWindow.loadURL('http://localhost:5173');
+      console.log('개발 모드: 로컬 서버 실패, dist 폴더 사용');
+      const devDistPath = path.join(__dirname, 'dist', 'index.html');
+      mainWindow.loadFile(devDistPath);
       mainWindow.webContents.openDevTools();
     }
   } else {
-    // 프로덕션 모드에서는 더 안전한 방식으로 로딩
-    try {
-      await loadAppFromUserData();
-    } catch (error) {
-      console.error('앱 로딩 실패, fallback 페이지 표시:', error);
+    // 프로덕션 모드: 여러 경로 시도
+    const possiblePaths = [
+      // 빌드된 앱 내부 경로 (일반적인 경우)
+      path.join(process.resourcesPath, 'app', 'dist', 'index.html'),
+      // 개발 시 또는 다른 구조
+      path.join(__dirname, 'dist', 'index.html'),
+      // 추가 fallback 경로
+      path.join(__dirname, '..', 'dist', 'index.html'),
+    ];
+
+    let loaded = false;
+
+    for (const distPath of possiblePaths) {
+      try {
+        console.log('프로덕션 모드: dist 파일 로드 시도');
+        console.log('시도 중인 경로:', distPath);
+
+        // 파일 존재 확인
+        await fs.access(distPath);
+        console.log('✅ dist/index.html 파일 발견!');
+
+        // 파일 로드
+        await mainWindow.loadFile(distPath);
+        console.log('✅ dist 파일 로드 성공');
+        loaded = true;
+        break;
+      } catch (error) {
+        console.log(`❌ 경로 실패: ${distPath}`);
+        console.log('오류:', error.message);
+        continue;
+      }
+    }
+
+    if (!loaded) {
+      console.error('❌ 모든 dist 경로에서 파일을 찾을 수 없습니다');
       await showDefaultPage();
     }
   }
 }
 
-async function loadAppFromUserData() {
-  // 플랫폼별 dist 파일 저장 위치 결정
-  const platform = process.platform;
-  let userDataDistPath, appDistPath;
-  
-  if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/recipe/dist
-    userDataDistPath = path.join(app.getPath('userData'), 'dist');
-    // macOS: 앱 번들 내부의 dist 폴더 (개발 시에는 __dirname/dist)
-    if (process.env.NODE_ENV === 'development') {
-      appDistPath = path.join(__dirname, 'dist');
-    } else {
-      // 프로덕션에서는 여러 가능한 경로 시도
-      const possiblePaths = [
-        path.join(process.resourcesPath, 'app', 'dist'),
-        path.join(__dirname, 'dist'),
-        path.join(__dirname, '..', 'dist'),
-        path.join(__dirname, '..', '..', 'dist')
-      ];
-      
-      // 첫 번째로 존재하는 경로 사용
-      for (const possiblePath of possiblePaths) {
-        try {
-          await fs.access(path.join(possiblePath, 'index.html'));
-          appDistPath = possiblePath;
-          console.log(`macOS에서 dist 폴더 발견: ${appDistPath}`);
-          break;
-        } catch (error) {
-          console.log(`경로 시도 실패: ${possiblePath}`);
-        }
-      }
-      
-      if (!appDistPath) {
-        appDistPath = path.join(process.resourcesPath, 'app', 'dist');
-      }
-    }
-  } else if (platform === 'win32') {
-    // Windows: %APPDATA%/recipe/dist
-    userDataDistPath = path.join(app.getPath('userData'), 'dist');
-    // Windows: 앱 설치 경로의 dist 폴더
-    appDistPath = process.env.NODE_ENV === 'development'
-      ? path.join(__dirname, 'dist')
-      : path.join(process.resourcesPath, 'app', 'dist');
-  } else {
-    // Linux: ~/.config/recipe/dist
-    userDataDistPath = path.join(app.getPath('userData'), 'dist');
-    appDistPath = process.env.NODE_ENV === 'development'
-      ? path.join(__dirname, 'dist')
-      : path.join(process.resourcesPath, 'app', 'dist');
-  }
-
-  console.log(`플랫폼: ${platform}`);
-  console.log(`userData 경로: ${userDataDistPath}`);
-  console.log(`앱 dist 경로: ${appDistPath}`);
-
-  // 1. 먼저 userData의 dist 폴더 확인 (업데이트된 파일)
-  const userDataIndexPath = path.join(userDataDistPath, 'index.html');
-
-  try {
-    await fs.access(userDataIndexPath);
-    console.log('업데이트된 dist 파일을 사용합니다.');
-    mainWindow.loadFile(userDataIndexPath);
-    return;
-  } catch (error) {
-    console.log('userData에 dist 파일이 없습니다.');
-  }
-
-  // 2. 빌드 시 포함된 dist 파일 확인 (기본 파일)
-  const appIndexPath = path.join(appDistPath, 'index.html');
-
-  try {
-    await fs.access(appIndexPath);
-    console.log('빌드 시 포함된 dist 파일을 사용합니다.');
-    
-    // 파일 내용 확인 (디버깅용)
-    try {
-      const fileContent = await fs.readFile(appIndexPath, 'utf-8');
-      console.log(`index.html 파일 크기: ${fileContent.length} bytes`);
-      console.log(`파일 시작 부분: ${fileContent.substring(0, 100)}...`);
-    } catch (readError) {
-      console.error('파일 읽기 실패:', readError);
-    }
-    
-    // macOS에서 더 안전한 방식으로 로딩
-    if (platform === 'darwin') {
-      // macOS에서는 data URL 방식 사용 (SIP 문제 방지)
-      try {
-        const fileContent = await fs.readFile(appIndexPath, 'utf-8');
-        const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(fileContent)}`;
-        console.log('macOS: data URL 방식으로 로딩');
-        mainWindow.loadURL(dataUrl);
-      } catch (readError) {
-        console.error('파일 읽기 실패, fallback 사용:', readError);
-        mainWindow.loadFile(appIndexPath);
-      }
-    } else {
-      // Windows/Linux에서는 기존 방식 사용
-      console.log('Windows/Linux: loadFile 방식으로 로딩');
-      mainWindow.loadFile(appIndexPath);
-    }
-    
-    // 기본 파일을 userData에 복사하여 다음 실행 시 사용
-    try {
-      await fs.mkdir(userDataDistPath, { recursive: true });
-      await copyDirectory(appDistPath, userDataDistPath);
-      console.log('기본 dist 파일을 userData에 복사했습니다.');
-    } catch (copyError) {
-      console.error('기본 dist 파일 복사 실패:', copyError);
-    }
-    
-    return;
-  } catch (error) {
-    console.log('빌드 시 포함된 dist 파일도 없습니다. 기본 페이지를 표시합니다.');
-    console.error('파일 접근 오류:', error);
-  }
-
-  // 3. 모든 dist 파일이 없는 경우 기본 페이지 표시
-  await showDefaultPage();
-}
+// loadAppFromUserData 함수 제거 (단순화를 위해)
 
 async function checkForUpdates() {
   if (process.env.NODE_ENV === 'development') {
@@ -238,17 +171,17 @@ async function getLatestVersionFromGitHub() {
       });
     });
 
-    req.on('error', (error) => {
+    req.on('error', error => {
       console.error('GitHub API 요청 오류:', error);
       resolve(null); // 네트워크 오류 시 null 반환
     });
-    
+
     req.setTimeout(10000, () => {
       req.destroy();
       console.error('GitHub API 요청 시간 초과');
       resolve(null); // 시간 초과 시 null 반환
     });
-    
+
     req.end();
   });
 }
@@ -265,22 +198,22 @@ async function getCurrentVersion() {
 }
 
 async function showDefaultPage() {
-  try {
-    // 간단한 기본 HTML 페이지 생성
-    const defaultHTML = `
+  console.log('⚠️  fallback 페이지 표시: dist 파일을 찾을 수 없습니다');
+
+  const fallbackHTML = `
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>레시피 관리 앱</title>
+    <title>레시피 관리 앱 - 오류</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             margin: 0;
             padding: 40px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: #f5f5f5;
+            color: #333;
             text-align: center;
             min-height: 100vh;
             display: flex;
@@ -289,102 +222,42 @@ async function showDefaultPage() {
             align-items: center;
         }
         .container {
-            background: rgba(255, 255, 255, 0.1);
+            background: white;
             padding: 40px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 20px;
-            color: #fff;
-        }
-        .subtitle {
-            font-size: 1.2em;
-            margin-bottom: 30px;
-            opacity: 0.9;
-        }
-        .message {
-            font-size: 1.1em;
-            margin-bottom: 30px;
-            line-height: 1.6;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
             max-width: 500px;
         }
-        .button {
-            background: rgba(255, 255, 255, 0.2);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-        .icon {
-            font-size: 4em;
-            margin-bottom: 20px;
-        }
+        h1 { color: #e74c3c; margin-bottom: 20px; }
+        .message { line-height: 1.6; margin-bottom: 20px; }
+        .path { background: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="icon">🍳</div>
-        <h1>그리고 밤은 되살아난다</h1>
-        <div class="subtitle">레시피 관리 앱</div>
+        <h1>🚨 파일 로드 오류</h1>
         <div class="message">
-            앱이 처음 실행되었습니다.<br>
-            GitHub에서 최신 버전을 다운로드하여 완전한 기능을 사용할 수 있습니다.
+            <p><strong>dist/index.html 파일을 찾을 수 없습니다.</strong></p>
+            <p>다음 경로를 확인해주세요:</p>
+            <div class="path">${path.join(__dirname, 'dist', 'index.html')}</div>
+            <br>
+            <p>해결 방법:</p>
+            <ol style="text-align: left;">
+                <li><code>npm run build</code> 실행</li>
+                <li><code>npm run electron-build</code> 실행</li>
+                <li>앱 재시작</li>
+            </ol>
         </div>
-        <button class="button" onclick="checkForUpdates()">업데이트 확인</button>
-        <br><br>
-        <button class="button" onclick="openGitHub()">GitHub 방문</button>
     </div>
-    
-    <script>
-        function checkForUpdates() {
-            // Electron의 업데이트 체크 함수 호출
-            if (window.electronAPI) {
-                window.electronAPI.checkForUpdates();
-            } else {
-                alert('업데이트 기능을 사용할 수 없습니다.');
-            }
-        }
-        
-        function openGitHub() {
-            if (window.electronAPI) {
-                window.electronAPI.openExternal('https://github.com/aiden-flo-fe/nightreborn');
-            } else {
-                window.open('https://github.com/aiden-flo-fe/nightreborn', '_blank');
-        }
-        }
-    </script>
 </body>
 </html>`;
 
-    // 임시 HTML 파일 생성
-    const tempDir = path.join(app.getPath('temp'), 'recipe-app');
-    await fs.mkdir(tempDir, { recursive: true });
-    const tempHTMLPath = path.join(tempDir, 'default.html');
-    await fs.writeFile(tempHTMLPath, defaultHTML);
-    
-    mainWindow.loadFile(tempHTMLPath);
-    
-    // 기본 페이지에서 업데이트 체크 시도
-    setTimeout(() => {
-      checkForUpdates();
-    }, 2000);
-    
+  try {
+    await mainWindow.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(fallbackHTML)}`
+    );
   } catch (error) {
-    console.error('기본 페이지 생성 실패:', error);
-    // 오류 발생 시 간단한 메시지 표시
-    mainWindow.loadURL('data:text/html,<html><body><h1>레시피 관리 앱</h1><p>앱을 초기화하는 중입니다...</p></body></html>');
+    console.error('fallback 페이지 로드도 실패:', error);
   }
 }
 
@@ -542,15 +415,15 @@ function extractZip(zipPath, outputDir) {
 async function copyDirectory(source, destination) {
   try {
     await fs.mkdir(destination, { recursive: true });
-    
+
     const items = await fs.readdir(source);
-    
+
     for (const item of items) {
       const sourcePath = path.join(source, item);
       const destPath = path.join(destination, item);
-      
+
       const stat = await fs.stat(sourcePath);
-      
+
       if (stat.isDirectory()) {
         await copyDirectory(sourcePath, destPath);
       } else {
@@ -562,20 +435,96 @@ async function copyDirectory(source, destination) {
   }
 }
 
+// macOS SIP 호환성을 위한 강화된 설정
+if (process.platform === 'darwin') {
+  // 핵심 보안 관련 플래그
+  app.commandLine.appendSwitch('--no-sandbox');
+  app.commandLine.appendSwitch('--disable-web-security');
+
+  // 렌더링 관련 플래그 (SIP 크래시 방지)
+  app.commandLine.appendSwitch(
+    '--disable-features',
+    'VizDisplayCompositor,OutOfBlinkCors'
+  );
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+  app.commandLine.appendSwitch('--disable-gpu-sandbox');
+
+  // 메모리 관련 플래그 (크래시 방지)
+  app.commandLine.appendSwitch('--max_old_space_size', '4096');
+  app.commandLine.appendSwitch('--disable-dev-shm-usage');
+  app.commandLine.appendSwitch('--no-zygote');
+
+  // macOS 특화 플래그
+  app.commandLine.appendSwitch('--disable-backgrounding-occluded-windows');
+  app.commandLine.appendSwitch('--disable-renderer-backgrounding');
+}
+
+// macOS 전용 추가 초기화 설정
+if (process.platform === 'darwin') {
+  // GPU 프로세스 비활성화 (SIP 크래시 방지)
+  app.disableHardwareAcceleration();
+
+  // 추가 안전 설정
+  app.commandLine.appendSwitch('--disable-gpu');
+  app.commandLine.appendSwitch('--disable-gpu-compositing');
+}
+
 // Electron 앱 이벤트
-app.whenReady().then(() => {
-  createWindow();
+app.whenReady().then(async () => {
+  // macOS에서 더 안전한 초기화를 위한 지연
+  if (process.platform === 'darwin') {
+    console.log('macOS SIP 호환 모드로 초기화 중...');
+    await new Promise(resolve => setTimeout(resolve, 2000)); // 2초 지연
+  }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
+  try {
+    await createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow().catch(error => {
+          console.error('창 재생성 실패:', error);
+          // 실패 시 기본 페이지라도 표시
+          showDefaultPage().catch(console.error);
+        });
+      }
+    });
+
+    // 앱 로드 후 업데이트 체크 (더 안전하게)
+    setTimeout(() => {
+      try {
+        checkForUpdates();
+      } catch (error) {
+        console.error('업데이트 체크 중 오류:', error);
+      }
+    }, 10000); // 10초 후 체크 (더 안정적)
+  } catch (error) {
+    console.error('앱 초기화 중 오류:', error);
+    // 오류 발생 시에도 기본 창은 생성
+    try {
+      await showDefaultPage();
+    } catch (fallbackError) {
+      console.error('fallback 페이지도 실패:', fallbackError);
+      // 최후의 수단: 빈 창이라도 생성
+      try {
+        mainWindow = new BrowserWindow({
+          width: 800,
+          height: 600,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: false,
+            webSecurity: false,
+            sandbox: false,
+          },
+        });
+        mainWindow.loadURL(
+          'data:text/html,<html><body><h1>레시피 관리 앱</h1><p>초기화 중...</p></body></html>'
+        );
+      } catch (finalError) {
+        console.error('최종 fallback도 실패:', finalError);
+      }
     }
-  });
-
-  // 앱 로드 후 업데이트 체크
-  setTimeout(() => {
-    checkForUpdates();
-  }, 3000); // 3초 후 체크
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -590,4 +539,27 @@ app.on('web-contents-created', (event, contents) => {
     event.preventDefault();
     require('electron').shell.openExternal(navigationUrl);
   });
+});
+
+// macOS SIP 문제 해결을 위한 추가 설정
+if (process.platform === 'darwin') {
+  // 프로세스 크래시 방지
+  process.on('uncaughtException', error => {
+    console.error('Uncaught Exception:', error);
+    // 크래시 대신 로그만 남기고 계속 실행
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // 크래시 대신 로그만 남기고 계속 실행
+  });
+}
+
+// 앱 종료 시 정리 작업
+app.on('before-quit', () => {
+  console.log('앱 종료 중...');
+});
+
+app.on('quit', () => {
+  console.log('앱이 종료되었습니다.');
 });

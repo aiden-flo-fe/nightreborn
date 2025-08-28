@@ -1,7 +1,7 @@
 {
   "name": "recipe",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.9.0",
   "type": "module",
   "main": "main.cjs",
   "homepage": "./",
@@ -14,8 +14,10 @@
     "preview": "vite preview",
     "electron": "electron .",
     "electron-dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && NODE_ENV=development electron .\"",
-    "electron-build": "npm run build && electron-builder",
-    "dist": "electron-builder --publish=never"
+    "electron-build": "npm run build-icons && npm run build && electron-builder",
+    "dist": "electron-builder --publish=never",
+    "build-icons": "node scripts/build-icons.cjs",
+    "build-icons-auto": "node scripts/build-icons-auto.cjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -39,7 +41,7 @@
     "@typescript-eslint/parser": "^8.41.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^9.2.1",
-    "electron": "^37.4.0",
+    "electron": "^22.3.27",
     "electron-builder": "^26.0.12",
     "eslint": "^9.34.0",
     "eslint-config-prettier": "^10.1.8",
@@ -56,7 +58,7 @@
   },
   "build": {
     "appId": "com.nightreborn.recipe",
-    "productName": "그리고 밤은 되살아난다 - 레시피 관리",
+    "productName": "그밤 레시피",
     "directories": {
       "output": "electron-dist"
     },
@@ -75,28 +77,6 @@
         ]
       }
     ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "레시피 관리"
-    },
     "mac": {
       "target": [
         {
@@ -107,7 +87,34 @@
           ]
         }
       ],
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon/icon.ico",
+      "uninstallerIcon": "assets/icon/icon.ico",
+      "installerHeaderIcon": "assets/icon/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "그밤 레시피"
     },
     "linux": {
       "target": [
@@ -118,7 +125,7 @@
           ]
         }
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon/512x512.png"
     },
     "publish": {
       "provider": "github",
