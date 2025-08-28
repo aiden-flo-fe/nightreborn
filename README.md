@@ -102,9 +102,8 @@ npm run dist
 
 ### 빌드 및 배포
 ``` bash
-npm run build
-npm run dist
-npx electron-builder // 윈도우용 배포
+npm run electron-build
+git tag v0.9.1 && git push origin v0.9.1
 ```
 
 ## 📋 데이터 모델

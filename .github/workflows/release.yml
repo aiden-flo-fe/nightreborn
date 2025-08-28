@@ -51,17 +51,38 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Ensure Windows icon (.ico)
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'build/icon/icon.ico')) {
+            Write-Host 'Generating icon.ico from build/icon/512x512.png using ImageMagick'
+            choco install imagemagick -y --no-progress
+            $env:Path += ';C:\\Program Files\\ImageMagick-7.0.11-Q16-HDRI'
+            magick --version
+            New-Item -ItemType Directory -Force -Path 'build/icon' | Out-Null
+            magick build/icon/512x512.png -define icon:auto-resize=256,128,64,48,32,16 build/icon/icon.ico
+          } else {
+            Write-Host 'icon.ico already exists, skipping generation'
+          }
 
       - name: Build React app
         run: npm run build
 
-      - name: Build Electron app
-        run: npm run electron-build
-
-      - name: Upload Windows executable
-        uses: softprops/action-gh-release@v2
-        with:
-          files: electron-dist/*.exe
+      - name: Build Electron app and publish release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish always
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-windows-artifacts
+          path: |
+            electron-dist/*.exe
+            electron-dist/*.msi
+            electron-dist/*.zip
+            electron-dist/*.yml
+            electron-dist/*.blockmap
+          if-no-files-found: ignore
