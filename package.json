@@ -1,7 +1,7 @@
 {
   "name": "recipe",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.2",
   "type": "module",
   "main": "main.cjs",
   "homepage": "./",
