@@ -179,7 +179,7 @@ userData/               # 앱 데이터 폴더 (사용자별)
 - IE는 지원하지 않습니다.
 
 ### Electron 앱 개발 시
-- `main.js`는 CommonJS 형식으로 작성되어 있습니다.
+- `main.cjs`는 CommonJS 형식으로 작성되어 있습니다.
 - 아이콘 파일들을 `assets/` 폴더에 배치하세요.
 - 개발 시에는 `npm run electron-dev`로 Hot Reload 사용 가능합니다.
 

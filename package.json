@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "main.js",
+  "main": "main.cjs",
   "homepage": "./",
   "scripts": {
     "dev": "vite",
@@ -59,7 +59,7 @@
       "output": "electron-dist"
     },
     "files": [
-      "main.js",
+      "main.cjs",
       "dist/**/*",
       "node_modules/**/*",
       "package.json"
