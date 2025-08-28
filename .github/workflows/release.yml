@@ -72,14 +72,14 @@ jobs:
         run: npx electron-builder --win --x64 --publish never
 
       - name: List dist output
-        run: ls -R dist
+        run: ls -R electron-dist
 
       - name: Upload Electron build artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/*.exe
-            dist/*.yml
-            dist/*.blockmap
+            electron-dist/*.exe
+            electron-dist/*.yml
+            electron-dist/*.blockmap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
