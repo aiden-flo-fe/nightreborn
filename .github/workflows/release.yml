@@ -60,32 +60,23 @@ jobs:
         shell: pwsh
         run: |
           if (!(Test-Path 'build/icon/icon.ico')) {
-            Write-Host 'Generating icon.ico from build/icon/512x512.png using ImageMagick'
             choco install imagemagick -y --no-progress
             $env:Path += ';C:\\Program Files\\ImageMagick-7.0.11-Q16-HDRI'
-            magick --version
-            New-Item -ItemType Directory -Force -Path 'build/icon' | Out-Null
             magick build/icon/512x512.png -define icon:auto-resize=256,128,64,48,32,16 build/icon/icon.ico
-          } else {
-            Write-Host 'icon.ico already exists, skipping generation'
           }
 
       - name: Build React app
         run: npm run build
 
-      - name: Build Electron app and publish release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --x64 --publish always
+      - name: Build Electron app (without publish)
+        run: npx electron-builder --win --x64 --publish never
 
-      - name: Upload artifacts (backup)
-        uses: actions/upload-artifact@v4
+      - name: Upload EXE to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: electron-windows-artifacts
-          path: |
-            electron-dist/*.exe
-            electron-dist/*.msi
-            electron-dist/*.zip
-            electron-dist/*.yml
-            electron-dist/*.blockmap
-          if-no-files-found: ignore
+          files: |
+            dist/*.exe
+            dist/*.yml
+            dist/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
