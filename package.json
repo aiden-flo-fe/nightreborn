@@ -58,7 +58,7 @@
   },
   "build": {
     "appId": "com.nightreborn.recipe",
-    "productName": "그밤 레시피",
+    "productName": "NightrebornRecipeSetup",
     "directories": {
       "output": "electron-dist"
     },

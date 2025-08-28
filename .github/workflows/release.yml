@@ -7,7 +7,7 @@ on:
 
 permissions:
   contents: write
-
+  
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -56,10 +56,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Ensure Windows icon (.ico)
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'build/icon/icon.ico')) {
+            choco install imagemagick -y --no-progress
+            $env:Path += ';C:\\Program Files\\ImageMagick-7.0.11-Q16-HDRI'
+            magick build/icon/512x512.png -define icon:auto-resize=256,128,64,48,32,16 build/icon/icon.ico
+          }
+
       - name: Build React app
         run: npm run build
 
-      - name: Build Electron app (no publish)
+      - name: Build Electron app (without publish)
         run: npx electron-builder --win --x64 --publish never
 
       - name: List dist output
@@ -69,7 +78,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/recipe-setup-*.exe
+            dist/*.exe
             dist/*.yml
             dist/*.blockmap
         env:
